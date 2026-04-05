@@ -252,7 +252,10 @@ with check (
 );
 
 -- Kebijakan: Siapa saja (Jemaah) boleh kirim pertanyaan
-create policy "Allow insert for everyone" on questions for insert with check (true);
+create policy "Allow insert for everyone"
+on questions
+for insert
+with check (true);
 
 -- Kebijakan: Semua orang bisa melihat pertanyaan
 create policy "Allow select answered only"
