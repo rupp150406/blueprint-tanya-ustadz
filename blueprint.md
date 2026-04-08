@@ -16,58 +16,132 @@
 ### folder structure ( V3 ) :
 
 ```
+# ============================================================
+# PROJECT STRUCTURE (UPDATED — HYBRID SERVER ARCHITECTURE)
+# ============================================================
+
 tanya-ustadz-app/
-├── .env                # ADMIN_GATE_PASSWORD, SUPABASE_URL, dll.
+├── .env
 ├── nuxt.config.ts
 ├── app.vue
-│
+
 ├── components/
-│   ├── ui/                 # Komponen dasar (Button.vue, Input.vue, Badge.vue)
-│   ├── AppHeader.vue       # Header Hijau untuk Jemaah (index.vue)
-│   ├── QuestionCard.vue    # Satu komponen untuk semua status (Terjawab/Pending)
+│   ├── ui/                 # Atomic UI (Button, Input, Badge)
+│   ├── AppHeader.vue       # Public header (Jemaah)
+│   ├── QuestionCard.vue    # Universal card (all statuses)
 │   └── Dashboard/
-│       ├── Sidebar.vue     # Sidebar Hijau (dari admin-dashboard.jpg)
-│       ├── UserProfile.vue # Widget di pojok kanan atas (dari select-role.jpg)
-│       ├── ReplyModal.vue  # Modal input jawaban Ustadz
-│       └── StatCard.vue    # Card ringkasan di halaman Archive & Dashboard
-│
+│       ├── Sidebar.vue
+│       ├── UserProfile.vue
+│       ├── ReplyModal.vue
+│       └── StatCard.vue
+
 ├── middleware/
-│   ├── gate-guard.ts       # Pintu 1: Cek apakah sudah isi Password Gate
-│   ├── auth.ts             # Pintu 2: Cek Sesi Google OAuth (Supabase)
-│   └── role-guard.ts       # Pintu 3: Cek apakah sudah pilih role (Admin/Ustadz)
-│
+│   ├── gate-guard.ts       # Gate 1: password access
+│   ├── auth.ts             # Gate 2: Supabase OAuth session
+│   └── role-guard.ts       # Gate 3: role validation
+
 ├── composables/
-│   ├── useQuestions.ts     # CRUD, Real-time logic, & Auto-delete 30 hari logic
-│   ├── useAdminAuth.ts     # State management untuk simpan role & session Google
-│   └── useUI.ts            # State untuk toggle Sidebar atau Modal
-│
+│   ├── useQuestions.ts     # Core business logic (CRUD + realtime)
+│   ├── useAdminAuth.ts     # Auth + role state
+│   └── useUI.ts            # UI state (modal, sidebar, toast)
+
 ├── pages/
-│   ├── index.vue           # Jemaah: Feed pertanyaan (Tab: Semua, Belum, Terjawab)
-│   ├── ask.vue             # Jemaah: Form kirim pertanyaan (dari ask-dot-vue.jpg)
-│   ├── success.vue         # Jemaah: Konfirmasi sukses (setelah kirim)
+│   ├── index.vue
+│   ├── ask.vue
+│   ├── success.vue
 │   │
-│   ├── password-page.vue   # Gate 1: Secure Gate (Latar Hijau Tua)
-│   ├── login-gate.vue      # Gate 2: Login Google OAuth
-│   ├── select-role.vue     # Gate 3: Pilih Admin/Ustadz (dari select-role-dot-vue.jpg)
+│   ├── password-page.vue
+│   ├── login-gate.vue
+│   ├── select-role.vue
 │   │
-│   └── dashboard/          # Folder Khusus Pengelola (Layout: Sidebar)
-│       ├── index.vue       # Pusat Moderasi (Admin) / Jawab (Ustadz)
-│       ├── archive.vue     # Gudang data & Fitur Pinned (dari admin-dashboard.jpg)
-│       └── profile.vue     # Pengaturan & Kontribusi (dari profile-dot-vue.jpg)
-│
+│   └── dashboard/
+│       ├── index.vue
+│       ├── archive.vue
+│       └── profile.vue
+
 ├── server/
 │   └── api/
-│       └── verify-gate.post.ts # Validasi password gerbang pertama
-│
-└── supabase/
-└── migrations/
-└── setup.sql       # Schema: id, question, answer, category, status, is_pinned, created_at
+│       ├── verify-gate.post.ts
+│       ├── questions/
+│       │   ├── index.post.ts       # create question
+│       │   └── vote.post.ts        # upvote
+│       ├── admin/
+│       │   ├── moderate.post.ts    # approve/reject
+│       │   └── pin.post.ts         # pin question
+│       └── ustadz/
+│           └── answer.post.ts      # answer question
 
-CaCatatan Implementasi:
+└── supabase/
+    └── migrations/
+        └── setup.sql
+
+
+# ============================================================
+# ARCHITECTURE FLOW (UPDATED)
+# ============================================================
+
+Client → Nuxt Server API → Supabase (Service Role) → Database
+
+- Semua operasi WRITE (insert, update, delete) melalui server API
+- Server menggunakan SUPABASE_SERVICE_ROLE_KEY (bypass RLS)
+- Client hanya menggunakan anon key untuk read & auth
+
+
+# ============================================================
+# COMPONENT RULES (UPDATED)
+# ============================================================
+
+- QuestionCard.vue adalah komponen utama untuk semua status & role
+- Tidak ada pemisahan komponen aksi (AdminAction / UstadzReply)
+- Semua aksi dikontrol via props / conditional rendering
+- ReplyModal.vue khusus untuk input jawaban Ustadz
+
+
+# ============================================================
+# SERVER API RULES
+# ============================================================
+
+Endpoint structure:
+
+- /api/questions
+  - POST: create question
+  - POST /vote: upvote system
+
+- /api/admin
+  - POST /moderate: approve/reject
+  - POST /pin: pin question
+
+- /api/ustadz
+  - POST /answer: answer question
+
+IMPORTANT:
+- Semua endpoint ini WAJIB menggunakan Supabase Service Role Key
+- Jangan gunakan anon key untuk operasi write
+
+
+# ============================================================
+# SECURITY RULES (UPDATED)
+# ============================================================
+
+- Semua operasi sensitif dilakukan via server API
+- Service Role Key hanya boleh di server (tidak pernah ke client)
+- RLS tetap aktif sebagai layer tambahan security
+- Client tidak boleh akses langsung operasi write ke database
+
+
+# ============================================================
+# IMPORTANT CONSTRAINTS
+# ============================================================
+
 - Delete tidak pernah dilakukan dari client
-- Semua penghapusan dilakukan oleh:
+- Delete hanya melalui:
   - Supabase Edge Function (cron job)
-  - atau server dengan service role
+  - atau server API (service role)
+
+- Status hanya:
+  pending | verified | rejected | answered
+
+- Semua validasi tetap dilakukan di server API (bukan client)
 ```
 
 # flow
