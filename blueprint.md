@@ -1,3 +1,4 @@
+[blueprint.md](https://github.com/user-attachments/files/26559397/blueprint.md)
 # Project Tanya Ustadz
 
 ## Goals :
